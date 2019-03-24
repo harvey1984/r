@@ -211,7 +211,7 @@ plot(ratio_ss, type = "b", xlab = "k")
 optMean <- kmeans(kData, 7, nstart = 20)
 plot(kData,col=optMean$cluster, pch=optMean$cluster, main=paste(7,"clusters - kmeans (euclidean)"))   
 ```
-# How Attrctive influent the results
+# How does attrctiveness influent the results
 ```{R}
 kDataMatch <- aggregatedData[3:10]
 matMean <- kmeans(kDataMatch, 7, nstart = 20)
@@ -224,7 +224,7 @@ ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
    theme_bw()
 ```
 
-# How Sincere influent the results
+# How does sincereness influent the results
 ```{R}
 kDataMatch <- aggregatedData[3:10]
 matMean <- kmeans(kDataMatch, 7, nstart = 20)
@@ -237,7 +237,7 @@ ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
    theme_bw()
 ```
 
-# How Intelligent influent the results
+# How does intelligence influent the results
 ```{R}
 kDataMatch <- aggregatedData[3:10]
 matMean <- kmeans(kDataMatch, 7, nstart = 20)
@@ -250,7 +250,7 @@ ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
    theme_bw()
 ```
 
-# How Fun influent the results
+# How does fun influent the results
 ```{R}
 kDataMatch <- aggregatedData[3:10]
 matMean <- kmeans(kDataMatch, 7, nstart = 20)
@@ -263,7 +263,7 @@ ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
    theme_bw()
 ```
 
-# How Shared Interests influent the results
+# How does shared interests influent the results
 ```{R}
 kDataMatch <- aggregatedData[3:10]
 matMean <- kmeans(kDataMatch, 7, nstart = 20)
