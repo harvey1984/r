@@ -1,0 +1,277 @@
+#Data import and clean
+```{R setup, include =FALSE}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(fmsb)
+library(psych)
+library(rpart)
+library(RColorBrewer)
+library(rpart.plot)
+library(e1071) # to perform Naive Bayes model
+masterData <- read.csv('~/Public/Speed Dating Data.csv', header = T, stringsAsFactors = F)
+masterData$attr_o[which(is.na(masterData$attr_o))] <- 0
+masterData$sinc_o[which(is.na(masterData$sinc_o))] <- 0
+masterData$intel_o[which(is.na(masterData$intel_o))] <- 0
+masterData$fun_o[which(is.na(masterData$fun_o))] <- 0
+masterData$amb_o[which(is.na(masterData$amb_o))] <- 0
+masterData$shar_o[which(is.na(masterData$shar_o))] <- 0
+masterData$attr1_1[which(is.na(masterData$attr1_1))] <- 0
+masterData$sinc1_1[which(is.na(masterData$sinc1_1))] <- 0
+masterData$intel1_1[which(is.na(masterData$intel1_1))] <- 0
+masterData$fun1_1[which(is.na(masterData$fun1_1))] <- 0
+masterData$amb1_1[which(is.na(masterData$amb1_1))] <- 0
+masterData$shar1_1[which(is.na(masterData$shar1_1))] <- 0
+masterData$shar1_1[which(is.na(masterData$income))] <- 0
+masterData$gender <- as.factor(raw_data$gender)
+masterData$career_c <- as.factor(raw_data$career_c)
+masterData$samerace <- as.factor(raw_data$samerace)
+masterData$race <- as.factor(raw_data$race)
+masterData$dec <- as.factor(raw_data$dec)
+masterData$date <- as.factor(raw_data$date)
+```
+#Simple visulization
+```{R}
+aggAge <- masterData %>% group_by(iid) %>% 
+  summarize(gender = paste(unique(gender)),
+            age = paste(unique(age)), 
+            selected = sum(dec_o, na.rm = FALSE), n = n())
+aggAge$gender <- as.factor(aggAge$gender)
+ggplot(data=aggAge,aes(x=age,fill=gender)) + 
+  geom_bar(data=subset(aggAge,gender=="0")) + 
+  geom_bar(data=subset(aggAge,gender=="1"),aes(y=..count..*(-1))) + 
+  scale_y_continuous(breaks=seq(-80,80,10),labels=abs(seq(-80,80,10))) + 
+  scale_fill_discrete("Gender", labels = c("Female", "Male")) +
+  coord_flip()
+```
+#Simple visulization
+#Is age really important for dating result
+```{R}
+aggAgeMatch <- masterData %>% group_by(iid) %>% 
+  summarize(gender = paste(unique(gender)),
+            age = paste(unique(age)), 
+            selected = sum(dec_o, na.rm = FALSE), n = n())  %>% 
+  mutate(Possibility = selected/n*100) %>% 
+  filter(Possibility > 50)
+aggAgeMatch$gender <- as.factor(aggAgeMatch$gender)
+ggplot(data=aggAgeMatch,aes(x=age,fill=gender)) + 
+  geom_bar(data=subset(aggAgeMatch,gender=="0")) + 
+  geom_bar(data=subset(aggAgeMatch,gender=="1"),aes(y=..count..*(-1))) + 
+  scale_y_continuous(breaks=seq(-80,80,10),labels=abs(seq(-80,80,10))) + 
+  scale_fill_discrete("Gender", labels = c("Female", "Male")) +
+  coord_flip()
+```
+
+
+```{R}
+data_career <- masterData %>% 
+  filter(!is.na(career_c)) %>% 
+  select(iid,gender, career_c)
+data_career <- unique(data_career, by = iid)
+
+career_label <- c("Lawyer", "Academic/Research", "Psychologist",  
+                  "Doctor/Medicine", "Engineer", "Creative Arts/Entertainment", 
+                  "Banking/Business", "Real Estate", "International Affairs", 
+                  "Undecided", "Social Work", "Speech Pathology", "Politics", 
+                  "Sports/Athletics", "Other", "Journalism", "Architecture")
+
+ggplot(data = data_career) +
+  geom_bar(aes(career_c, fill=gender)) + 
+  scale_x_discrete(label = career_label) + coord_flip() + 
+  labs(title = "Distribution of Career", x = "career_c", y = "Count") + 
+  scale_fill_discrete("Gender", labels = c("Female", "Male"))
+```
+
+#Is career really important for dating result
+```{R}
+data_career <- masterData %>% 
+  filter(!is.na(career_c), match == "1") %>% 
+  select(iid,gender, career_c)
+data_career <- unique(data_career, by = iid)
+career_label <- c("Lawyer", "Academic/Research", "Psychologist",  
+                  "Doctor/Medicine", "Engineer", "Creative Arts/Entertainment", 
+                  "Banking/Business", "Real Estate", "International Affairs", 
+                  "Undecided", "Social Work", "Speech Pathology", "Politics", 
+                  "Sports/Athletics", "Other", "Journalism", "Architecture")
+
+ggplot(data = data_career) +
+  geom_bar(aes(career_c, fill=gender)) + 
+  scale_x_discrete(label = career_label) + coord_flip() + 
+  labs(title = "Distribution of  Career", x = "career_c", y = "Count") + 
+  scale_fill_discrete("Gender", labels = c("Female", "Male"))
+```
+
+##The attributes men and women are looking for in a match?
+```{R}
+tempAttr<-
+masterData %>%
+group_by(gender) %>%
+select(iid, gender, pid, attr1_1, sinc1_1, intel1_1, fun1_1, amb1_1, shar1_1) %>% 
+filter(!pid == "NA")
+tempAttr[is.na(tempAttr)] <- 0
+tempAttr$total <- rowSums(tempAttr[,c("attr1_1", "sinc1_1", "intel1_1", "fun1_1", "amb1_1", "shar1_1")])
+table(tempAttr$total)
+tempAttr<-
+tempAttr %>% 
+filter(!total == "0")
+tempAttr$attr1_1 <- round(tempAttr$attr1_1/tempAttr$total*100, digits = 2)
+tempAttr$sinc1_1 <- round(tempAttr$sinc1_1/tempAttr$total*100, digits = 2)
+tempAttr$intel1_1 <- round(tempAttr$intel1_1/tempAttr$total*100, digits = 2)
+tempAttr$fun1_1 <- round(tempAttr$fun1_1/tempAttr$total*100, digits = 2)
+tempAttr$amb1_1 <- round(tempAttr$amb1_1/tempAttr$total*100, digits = 2)
+tempAttr$shar1_1 <- round(tempAttr$shar1_1/tempAttr$total*100, digits = 2)
+tempAttr$total <- rowSums(tempAttr[,c("attr1_1", "sinc1_1", "intel1_1", "fun1_1", "amb1_1", "shar1_1")])
+tempAttr$total <- round(tempAttr$total, digits = 0)
+table(tempAttr$total)
+
+finalAttr <-
+tempAttr %>%
+group_by(gender) %>%
+summarise(Attractive = mean(attr1_1), Sincere = mean(sinc1_1), Intelligent = mean(intel1_1), Fun = mean(fun1_1), Ambitious = mean(amb1_1), Interest = mean(shar1_1))
+finalforplot <-
+finalAttr %>% 
+select(-gender)
+maxmin <- data.frame(
+Attractive = c(30, 0),
+Sincere = c(30, 0),
+Intelligent = c(30, 0),
+Fun = c(30, 0),
+Ambitious = c(30, 0),
+Interest = c(30, 0))
+finalAttr <- rbind(maxmin, finalforplot)
+finalMale <- test11[c(1,2,4),]
+finalFemale <- test11[c(1,2,3),]
+radarchart(finalAttr,pty = 32,axistype = 0,pcol = c(adjustcolor("hotpink1", 0.5), adjustcolor("cadetblue2", 0.5)),pfcol = c(adjustcolor("hotpink1", 0.5), adjustcolor("cadetblue2", 0.5)),plty = 1,plwd = 3,cglty = 1,cglcol = "gray88",centerzero = TRUE,seg = 5,vlcex = 0.75,palcex = 0.75)
+legend("topleft", 
+       c("Male", "Female"),
+       fill = c(adjustcolor("cadetblue2", 0.5), adjustcolor("hotpink1", 0.5)))
+```
+
+
+
+#Summarize data
+```{R}
+aggregatedTestData <- masterData %>% group_by(iid) %>% 
+  summarize(gender = mean(as.numeric(gender)), 
+            Attrctive = mean(attr1_1, na.rm = FALSE), 
+            Sincere = mean(sinc1_1, na.rm = FALSE), 
+            Intelligent = mean(intel1_1, na.rm = FALSE), 
+            Fun = mean(fun1_1, na.rm = FALSE), 
+            Ambitious = mean(amb1_1, na.rm = FALSE), 
+            Shared = mean(shar1_1, na.rm = FALSE), 
+            selected = sum(dec_o, na.rm = FALSE), n = n())  %>% 
+  mutate(Possibility = selected/n*100) %>% 
+  filter(Possibility > 0)
+
+aggregatedData <- masterData %>% group_by(iid) %>% 
+  summarize(gender = mean(as.numeric(gender)), 
+            Attrctive = mean(attr_o, na.rm = FALSE), 
+            Sincere = mean(sinc_o, na.rm = FALSE), 
+            Intelligent = mean(intel_o, na.rm = FALSE), 
+            Fun = mean(fun_o, na.rm = FALSE), 
+            Ambitious = mean(amb_o, na.rm = FALSE), 
+            Shared = mean(shar_o, na.rm = FALSE), 
+            selected = sum(dec_o, na.rm = FALSE), n = n())  %>% 
+  mutate(Possibility = selected/n*100) %>% 
+  filter(Possibility > 0)
+m <- cor(aggregatedData)
+corrplot(m, method="circle")
+```
+#Naive Bayes
+```{R}
+men <- aggregatedTestData %>% filter(gender == 1)
+women <- aggregatedData %>% filter(gender == 0)
+pairs.panels(men[ , c(3:8, 11)], 
+             method = "pearson", scale = TRUE, ellipses = FALSE, 
+             labels = c("Attractive", "Sincere", "Intelligent", "Fun", 
+                        "Ambitious", "Interests", "Selected"), 
+             cex.labels = 1.3, hist.col = "lightblue")
+
+Pro <- ifelse(men$Possibility > 50,"High","Low")
+men <- data.frame(men, Pro)
+women <- data.frame(men, Pro)
+trainingData <- naiveBayes(Pro~., data=men)
+pred <- predict(trainingData, women)
+table(Actual=women$Pro, Predicted=pred)
+```
+#Kmeans
+```{R}
+# Initialise ratio_ss
+ratio_ss <- rep(0, 7)
+kData <- aggregatedData[3:8]
+# Finish the for-loop
+for (k in 1:7) {
+  # Apply k-means to school_result: school_km
+  menMean <- kmeans(kData, k, nstart = 20)
+  # Save the ratio between of WSS to TSS in kth element of ratio_ss
+  ratio_ss[k] <- menMean$tot.withinss / menMean$totss
+}
+# Make a scree plot with type "b" and xlab "k"
+plot(ratio_ss, type = "b", xlab = "k")
+optMean <- kmeans(kData, 7, nstart = 20)
+plot(kData,col=optMean$cluster, pch=optMean$cluster, main=paste(7,"clusters - kmeans (euclidean)"))   
+```
+# How Attrctive influent the results
+```{R}
+kDataMatch <- aggregatedData[3:10]
+matMean <- kmeans(kDataMatch, 7, nstart = 20)
+a <- tapply(kDataMatch$Attrctive,matMean$cluster,mean)
+b <- tapply(kDataMatch$selected,matMean$cluster,mean)
+kcenters <- data.frame(a,b)
+ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
+   geom_point(aes(Attrctive,selected, col=cluster),size=2) +
+   geom_point(data=cbind(kcenters, cluster=factor(1:nrow(kcenters))),aes(a,b),pch=8,size=10) + 
+   theme_bw()
+```
+
+# How Sincere influent the results
+```{R}
+kDataMatch <- aggregatedData[3:10]
+matMean <- kmeans(kDataMatch, 7, nstart = 20)
+a <- tapply(kDataMatch$Sincere,matMean$cluster,mean)
+b <- tapply(kDataMatch$selected,matMean$cluster,mean)
+kcenters <- data.frame(a,b)
+ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
+   geom_point(aes(Sincere,selected, col=cluster),size=2) +
+   geom_point(data=cbind(kcenters, cluster=factor(1:nrow(kcenters))),aes(a,b),pch=8,size=10) + 
+   theme_bw()
+```
+
+# How Intelligent influent the results
+```{R}
+kDataMatch <- aggregatedData[3:10]
+matMean <- kmeans(kDataMatch, 7, nstart = 20)
+a <- tapply(kDataMatch$Intelligent,matMean$cluster,mean)
+b <- tapply(kDataMatch$selected,matMean$cluster,mean)
+kcenters <- data.frame(a,b)
+ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
+   geom_point(aes(Intelligent,selected, col=cluster),size=2) +
+   geom_point(data=cbind(kcenters, cluster=factor(1:nrow(kcenters))),aes(a,b),pch=8,size=10) + 
+   theme_bw()
+```
+
+# How Fun influent the results
+```{R}
+kDataMatch <- aggregatedData[3:10]
+matMean <- kmeans(kDataMatch, 7, nstart = 20)
+a <- tapply(kDataMatch$Fun,matMean$cluster,mean)
+b <- tapply(kDataMatch$selected,matMean$cluster,mean)
+kcenters <- data.frame(a,b)
+ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
+   geom_point(aes(Fun,selected, col=cluster),size=2) +
+   geom_point(data=cbind(kcenters, cluster=factor(1:nrow(kcenters))),aes(a,b),pch=8,size=10) + 
+   theme_bw()
+```
+
+# How Shared Interests influent the results
+```{R}
+kDataMatch <- aggregatedData[3:10]
+matMean <- kmeans(kDataMatch, 7, nstart = 20)
+a <- tapply(kDataMatch$Shared,matMean$cluster,mean)
+b <- tapply(kDataMatch$selected,matMean$cluster,mean)
+kcenters <- data.frame(a,b)
+ggplot(cbind(kDataMatch,cluster=factor(matMean$cluster))) +
+   geom_point(aes(Shared,selected, col=cluster),size=2) +
+   geom_point(data=cbind(kcenters, cluster=factor(1:nrow(kcenters))),aes(a,b),pch=8,size=10) + 
+   theme_bw()
+```
